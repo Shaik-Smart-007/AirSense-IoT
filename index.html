@@ -1,0 +1,2871 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AirSense-IoT — Air Quality Monitoring System with Ventilation</title>
+  <meta name="description" content="Real-time ESP32 indoor air quality, temperature, humidity, and smoke-response monitor with Firebase Realtime Database polling and offline demo simulation." />
+  <meta property="og:title" content="AirSense-IoT" />
+  <meta property="og:description" content="Air Quality Monitoring System with Ventilation" />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #090d16;
+      --surface: #111827;
+      --surface-elevated: #151e30;
+      --surface-recessed: #0a0f1a;
+      --surface-subtle: rgba(255, 255, 255, 0.035);
+      --border: rgba(255, 255, 255, 0.08);
+      --border-strong: rgba(255, 255, 255, 0.15);
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --text-soft: #64748b;
+      --accent: #10b981;
+      --accent-cyan: #06b6d4;
+      --accent-hover: #34d399;
+      --accent-soft: rgba(16, 185, 129, 0.14);
+      --accent-cyan-soft: rgba(6, 182, 212, 0.14);
+      --accent-text: #6ee7b7;
+      --ok: #10b981;
+      --ok-bright: #34d399;
+      --ok-soft: rgba(16, 185, 129, 0.14);
+      --ok-border: rgba(52, 211, 153, 0.34);
+      --warn: #f59e0b;
+      --warn-bright: #fbbf24;
+      --warn-soft: rgba(245, 158, 11, 0.14);
+      --warn-border: rgba(251, 191, 36, 0.36);
+      --alert: #ef4444;
+      --alert-bright: #f87171;
+      --alert-hover: #dc2626;
+      --alert-soft: rgba(239, 68, 68, 0.15);
+      --alert-border: rgba(248, 113, 113, 0.45);
+      --demo: #38bdf8;
+      --demo-soft: rgba(56, 189, 248, 0.14);
+      --demo-border: rgba(56, 189, 248, 0.34);
+      --cool: #38bdf8;
+      --cool-soft: rgba(56, 189, 248, 0.14);
+      --hot: #f87171;
+      --hot-soft: rgba(248, 113, 113, 0.15);
+      --led-green-on: #10b981;
+      --led-red-on: #ef4444;
+      --led-off: #273244;
+      --chart-mq: #2dd4bf;
+      --chart-mq-alert: #f87171;
+      --chart-temp: #38bdf8;
+      --chart-grid: rgba(255, 255, 255, 0.06);
+      --chart-threshold: #f87171;
+      --focus-ring: #2dd4bf;
+      --radius-lg: 16px;
+      --radius-md: 10px;
+      --radius-sm: 7px;
+      --shadow-card: 0 2px 6px rgba(0, 0, 0, 0.35), 0 16px 36px -12px rgba(0, 0, 0, 0.65);
+      --shadow-card-hover: 0 8px 20px rgba(0, 0, 0, 0.45), 0 22px 44px -12px rgba(0, 0, 0, 0.75);
+      --shadow-hero: 0 4px 14px rgba(0, 0, 0, 0.45), 0 20px 44px -12px rgba(16, 185, 129, 0.14);
+      --shadow-btn: 0 1px 2px rgba(0, 0, 0, 0.4);
+      --inner-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      --transition: 200ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+
+    [hidden] {
+      display: none !important;
+    }
+
+    html {
+      -webkit-text-size-adjust: 100%;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      position: relative;
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      font-size: 15px;
+      line-height: 1.5;
+      letter-spacing: 0.005em;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Ambient top-of-screen telemetry aura */
+    body::before {
+      content: "";
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 440px;
+      pointer-events: none;
+      z-index: 0;
+      background:
+        radial-gradient(ellipse 68% 72% at 36% -12%, rgba(16, 185, 129, 0.19), transparent 68%),
+        radial-gradient(ellipse 56% 64% at 72% -16%, rgba(6, 182, 212, 0.15), transparent 68%),
+        linear-gradient(180deg, rgba(16, 185, 129, 0.04) 0%, transparent 100%);
+      transition: background 320ms ease, opacity 320ms ease;
+    }
+
+    body.is-alert::before {
+      background:
+        radial-gradient(ellipse 82% 88% at 50% -14%, rgba(239, 68, 68, 0.28), transparent 70%),
+        radial-gradient(ellipse 55% 60% at 20% -10%, rgba(249, 115, 22, 0.16), transparent 65%),
+        linear-gradient(180deg, rgba(239, 68, 68, 0.08) 0%, transparent 100%);
+    }
+
+    .top-accent-bar {
+      position: relative;
+      z-index: 1;
+      height: 3px;
+      width: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent-cyan), var(--accent));
+      box-shadow: 0 0 18px rgba(16, 185, 129, 0.45);
+      transition: background 260ms ease, box-shadow 260ms ease;
+    }
+
+    body.is-alert .top-accent-bar {
+      background: linear-gradient(90deg, var(--alert), #f97316, var(--alert));
+      box-shadow: 0 0 22px rgba(239, 68, 68, 0.65);
+    }
+
+    .app-shell {
+      position: relative;
+      z-index: 1;
+      max-width: 1260px;
+      margin: 0 auto;
+      padding: 20px 24px 48px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .tabular {
+      font-family: var(--font-mono);
+      font-variant-numeric: tabular-nums;
+    }
+
+    button {
+      font-family: inherit;
+      cursor: pointer;
+    }
+
+    button:focus-visible,
+    [tabindex]:focus-visible {
+      outline: 2px solid var(--focus-ring);
+      outline-offset: 2px;
+    }
+
+    /* Header */
+    .app-header {
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0) 100%), var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-card), var(--inner-highlight);
+      padding: 16px 22px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px 24px;
+      backdrop-filter: blur(12px);
+    }
+
+    .brand-block {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      width: 40px;
+      height: 40px;
+      border-radius: 11px;
+      background-color: var(--surface-recessed);
+      border: 1px solid rgba(16, 185, 129, 0.28);
+      box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.6), 0 0 18px rgba(16, 185, 129, 0.14);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent-hover);
+      flex-shrink: 0;
+      transition: border-color var(--transition), color var(--transition), box-shadow var(--transition);
+    }
+
+    body.is-alert .brand-mark {
+      border-color: var(--alert-border);
+      color: var(--alert-bright);
+      box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.6), 0 0 20px rgba(239, 68, 68, 0.28);
+    }
+
+    .brand-copy {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .brand-title {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+      color: var(--text);
+    }
+
+    .brand-subtitle {
+      margin: 0;
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.35;
+    }
+
+    .header-controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px 16px;
+    }
+
+    .connection-cluster {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 3px;
+      min-width: 170px;
+    }
+
+    .connection-row {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+    }
+
+    .conn-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+
+    .conn-badge[data-state="LIVE"] {
+      background-color: var(--ok-soft);
+      color: var(--ok-bright);
+      border-color: var(--ok-border);
+    }
+
+    .conn-badge[data-state="STALE"] {
+      background-color: var(--warn-soft);
+      color: var(--warn-bright);
+      border-color: var(--warn-border);
+    }
+
+    .conn-badge[data-state="DEMO"] {
+      background-color: var(--demo-soft);
+      color: var(--demo);
+      border-color: var(--demo-border);
+    }
+
+    .conn-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: currentColor;
+      flex-shrink: 0;
+      position: relative;
+    }
+
+    .conn-badge[data-state="LIVE"] .conn-dot,
+    .conn-badge[data-state="DEMO"] .conn-dot {
+      animation: conn-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+
+    @keyframes conn-pulse {
+      0%, 100% {
+        opacity: 1;
+        box-shadow: 0 0 0 0 currentColor;
+      }
+      50% {
+        opacity: 0.72;
+        box-shadow: 0 0 0 5px transparent;
+      }
+    }
+
+    .sync-counter {
+      font-size: 12px;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    .conn-reason {
+      margin: 0;
+      font-size: 12px;
+      color: var(--warn-bright);
+      text-align: right;
+      max-width: 280px;
+    }
+
+    .conn-reason:empty {
+      display: none;
+    }
+
+    .action-group {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      min-height: 38px;
+      padding: 8px 14px;
+      border-radius: var(--radius-md);
+      font-size: 13px;
+      font-weight: 600;
+      border: 1px solid var(--border-strong);
+      background-color: var(--surface-elevated);
+      color: var(--text);
+      box-shadow: var(--shadow-btn), var(--inner-highlight);
+      white-space: nowrap;
+      transition: background-color var(--transition), border-color var(--transition), box-shadow var(--transition), transform var(--transition);
+    }
+
+    .btn:hover:not(:disabled) {
+      background-color: #1c283d;
+      border-color: rgba(255, 255, 255, 0.25);
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-card);
+    }
+
+    .btn:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    .btn:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .btn-alert {
+      background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%);
+      border-color: rgba(252, 165, 165, 0.35);
+      color: #ffffff;
+      box-shadow: 0 4px 14px rgba(239, 68, 68, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+    }
+
+    .btn-alert:hover:not(:disabled) {
+      background: linear-gradient(180deg, #f87171 0%, #ef4444 100%);
+      border-color: rgba(252, 165, 165, 0.55);
+      box-shadow: 0 6px 20px rgba(239, 68, 68, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+    }
+
+    .btn-ghost {
+      border-color: transparent;
+      background-color: transparent;
+      box-shadow: none;
+      color: var(--text-muted);
+      padding: 6px 10px;
+      min-height: 34px;
+    }
+
+    .btn-ghost:hover:not(:disabled) {
+      background-color: rgba(255, 255, 255, 0.06);
+      color: var(--text);
+      border-color: transparent;
+      box-shadow: none;
+    }
+
+    /* Toggle switch */
+    .toggle-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      min-height: 38px;
+      padding: 6px 13px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-strong);
+      background-color: var(--surface-elevated);
+      color: var(--text);
+      box-shadow: var(--shadow-btn), var(--inner-highlight);
+      font-size: 13px;
+      font-weight: 600;
+      white-space: nowrap;
+      transition: background-color var(--transition), border-color var(--transition), box-shadow var(--transition), transform var(--transition);
+    }
+
+    .toggle-btn:hover {
+      background-color: #1c283d;
+      transform: translateY(-1px);
+    }
+
+    .toggle-track {
+      width: 34px;
+      height: 19px;
+      border-radius: 999px;
+      background-color: #263349;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      position: relative;
+      transition: background-color var(--transition), border-color var(--transition);
+      flex-shrink: 0;
+    }
+
+    .toggle-thumb {
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      background-color: #e2e8f0;
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      transition: transform var(--transition), background-color var(--transition);
+    }
+
+    .toggle-btn[aria-checked="true"] {
+      border-color: var(--demo-border);
+      background-color: var(--demo-soft);
+      color: #bae6fd;
+    }
+
+    .toggle-btn[aria-checked="true"] .toggle-track {
+      background-color: var(--demo);
+      border-color: transparent;
+    }
+
+    .toggle-btn[aria-checked="true"] .toggle-thumb {
+      transform: translateX(15px);
+      background-color: #082f49;
+    }
+
+    /* Preheat banner */
+    .preheat-banner {
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.025) 0%, rgba(255, 255, 255, 0) 100%), var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-card), var(--inner-highlight);
+      padding: 14px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px 20px;
+    }
+
+    .preheat-info {
+      flex: 1 1 340px;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      min-width: 0;
+    }
+
+    .preheat-top {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .preheat-title {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .preheat-timer {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--accent-text);
+    }
+
+    .preheat-desc {
+      margin: 0;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .preheat-track {
+      height: 6px;
+      width: 100%;
+      background-color: var(--surface-recessed);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .preheat-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent), var(--accent-cyan));
+      border-radius: 999px;
+      transition: width 300ms ease;
+    }
+
+    .preheat-banner.is-ready .preheat-fill {
+      background: linear-gradient(90deg, var(--ok), var(--ok-bright));
+    }
+
+    .preheat-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    /* Grids & Cards */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: 1.45fr 1fr 1fr;
+      gap: 16px;
+    }
+
+    .actuators-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .analytics-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+      gap: 16px;
+      align-items: stretch;
+    }
+
+    .card {
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.028) 0%, rgba(255, 255, 255, 0) 48%), var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-card), var(--inner-highlight);
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-width: 0;
+      transition: border-color var(--transition), background var(--transition), box-shadow var(--transition), transform var(--transition);
+    }
+
+    .card:hover {
+      border-color: rgba(255, 255, 255, 0.14);
+      box-shadow: var(--shadow-card-hover), var(--inner-highlight);
+      transform: translateY(-2px);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .card-title-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .card-title {
+      margin: 0;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      color: var(--text-muted);
+    }
+
+    .card-meta {
+      font-size: 11.5px;
+      color: var(--text-soft);
+      padding: 2px 7px;
+      border-radius: 5px;
+      background-color: var(--surface-recessed);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      white-space: nowrap;
+    }
+
+    /* Hero MQ-135 Gauge Card */
+    .card-mq135 {
+      border-color: rgba(16, 185, 129, 0.28);
+      box-shadow: var(--shadow-hero), var(--inner-highlight);
+      background:
+        radial-gradient(ellipse 85% 75% at 50% 0%, rgba(16, 185, 129, 0.1), transparent 70%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0) 50%),
+        var(--surface);
+    }
+
+    body.is-alert .card-mq135 {
+      border-color: var(--alert-border);
+      box-shadow: 0 6px 26px rgba(239, 68, 68, 0.24), var(--inner-highlight);
+      background:
+        radial-gradient(ellipse 90% 80% at 50% 0%, rgba(239, 68, 68, 0.18), transparent 72%),
+        linear-gradient(180deg, rgba(239, 68, 68, 0.06) 0%, rgba(255, 255, 255, 0) 55%),
+        var(--surface);
+    }
+
+    .gauge-stage {
+      position: relative;
+      width: 100%;
+      max-width: 310px;
+      margin: 2px auto 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .gauge-svg {
+      width: 100%;
+      height: auto;
+      display: block;
+      overflow: visible;
+    }
+
+    .gauge-track-arc {
+      fill: none;
+      stroke: var(--surface-recessed);
+      stroke-width: 18;
+      stroke-linecap: round;
+    }
+
+    .gauge-track-inner {
+      fill: none;
+      stroke: rgba(255, 255, 255, 0.06);
+      stroke-width: 18;
+      stroke-linecap: round;
+    }
+
+    .gauge-progress-arc {
+      fill: none;
+      stroke: url(#mqGaugeGradClean);
+      stroke-width: 18;
+      stroke-linecap: round;
+      filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.45));
+      transition: stroke-dashoffset 280ms cubic-bezier(0.16, 1, 0.3, 1), filter var(--transition);
+    }
+
+    body.is-alert .gauge-progress-arc {
+      stroke: url(#mqGaugeGradAlert);
+      filter: drop-shadow(0 0 12px rgba(239, 68, 68, 0.65));
+    }
+
+    .gauge-progress-arc.is-warmup {
+      stroke: url(#mqGaugeGradWarn);
+      filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.45));
+    }
+
+    .gauge-threshold-tick {
+      stroke: #fbbf24;
+      stroke-width: 2.5;
+      stroke-linecap: round;
+      filter: drop-shadow(0 0 5px rgba(251, 191, 36, 0.7));
+    }
+
+    .gauge-threshold-dot {
+      fill: #fbbf24;
+    }
+
+    .gauge-threshold-label {
+      fill: #fde68a;
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      font-weight: 700;
+    }
+
+    .gauge-center-overlay {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 4px;
+      pointer-events: none;
+    }
+
+    .gauge-value {
+      font-size: 40px;
+      font-weight: 700;
+      line-height: 1;
+      letter-spacing: -0.03em;
+      color: var(--text);
+    }
+
+    body.is-alert .gauge-value {
+      color: var(--alert-bright);
+    }
+
+    .gauge-unit {
+      font-size: 11.5px;
+      font-weight: 500;
+      color: var(--text-soft);
+    }
+
+    .metric-status-badge {
+      display: inline-flex;
+      align-items: center;
+      align-self: center;
+      gap: 6px;
+      margin-top: 2px;
+      padding: 5px 12px;
+      border-radius: 999px;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      background-color: var(--surface-recessed);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      transition: background-color var(--transition), color var(--transition), border-color var(--transition), box-shadow var(--transition);
+    }
+
+    .metric-status-badge.is-ok {
+      background-color: var(--ok-soft);
+      color: var(--ok-bright);
+      border-color: var(--ok-border);
+      box-shadow: 0 0 14px rgba(16, 185, 129, 0.16);
+    }
+
+    .metric-status-badge.is-warn {
+      background-color: var(--warn-soft);
+      color: var(--warn-bright);
+      border-color: var(--warn-border);
+    }
+
+    .metric-status-badge.is-alert {
+      background-color: var(--alert);
+      color: #ffffff;
+      border-color: rgba(252, 165, 165, 0.5);
+      box-shadow: 0 0 18px rgba(239, 68, 68, 0.45);
+    }
+
+    .gauge-footer-scale {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-top: 6px;
+      margin-top: 2px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      font-size: 11.5px;
+      color: var(--text-soft);
+    }
+
+    .gauge-threshold-pill {
+      color: #fcd34d;
+      font-weight: 600;
+    }
+
+    /* Temperature & Humidity Cards */
+    .card-env {
+      justify-content: space-between;
+    }
+
+    .env-icon-badge {
+      width: 32px;
+      height: 32px;
+      border-radius: 9px;
+      background-color: var(--surface-recessed);
+      border: 1px solid var(--border);
+      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.55);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+      flex-shrink: 0;
+      transition: color var(--transition), border-color var(--transition), box-shadow var(--transition);
+    }
+
+    .env-icon-badge svg {
+      width: 17px;
+      height: 17px;
+    }
+
+    .env-icon-badge.temp-badge {
+      color: #38bdf8;
+      border-color: rgba(56, 189, 248, 0.25);
+    }
+
+    .env-icon-badge.hum-badge {
+      color: #2dd4bf;
+      border-color: rgba(45, 212, 191, 0.25);
+    }
+
+    .metric-reading {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 6px 0;
+    }
+
+    .metric-value {
+      font-size: 40px;
+      font-weight: 700;
+      line-height: 1.05;
+      letter-spacing: -0.025em;
+      color: var(--text);
+    }
+
+    .metric-unit {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-soft);
+    }
+
+    .metric-cue {
+      display: inline-flex;
+      align-items: center;
+      align-self: flex-start;
+      gap: 6px;
+      font-size: 12.5px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: var(--radius-sm);
+      background-color: var(--surface-recessed);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      margin-top: auto;
+      transition: background-color var(--transition), color var(--transition), border-color var(--transition);
+    }
+
+    /* Contextual Temperature & Humidity Accents */
+    .card-env[data-cue="cool"],
+    .card-env[data-cue="dry"] {
+      border-color: rgba(56, 189, 248, 0.34);
+    }
+
+    .card-env[data-cue="cool"] .metric-cue,
+    .card-env[data-cue="dry"] .metric-cue {
+      background-color: var(--cool-soft);
+      border-color: rgba(56, 189, 248, 0.3);
+      color: var(--cool);
+    }
+
+    .card-env[data-cue="comfortable"] {
+      border-color: rgba(16, 185, 129, 0.32);
+    }
+
+    .card-env[data-cue="comfortable"] .metric-cue {
+      background-color: var(--ok-soft);
+      border-color: var(--ok-border);
+      color: var(--ok-bright);
+    }
+
+    .card-env[data-cue="warm"],
+    .card-env[data-cue="humid"] {
+      border-color: rgba(245, 158, 11, 0.36);
+    }
+
+    .card-env[data-cue="warm"] .metric-cue,
+    .card-env[data-cue="humid"] .metric-cue {
+      background-color: var(--warn-soft);
+      border-color: var(--warn-border);
+      color: var(--warn-bright);
+    }
+
+    .card-env[data-cue="warm"] .env-icon-badge.temp-badge {
+      color: var(--warn-bright);
+      border-color: var(--warn-border);
+    }
+
+    .card-env[data-cue="hot"] {
+      border-color: var(--alert-border);
+    }
+
+    .card-env[data-cue="hot"] .metric-cue {
+      background-color: var(--hot-soft);
+      border-color: var(--alert-border);
+      color: var(--hot);
+    }
+
+    .card-env[data-cue="hot"] .env-icon-badge.temp-badge {
+      color: var(--hot);
+      border-color: var(--alert-border);
+    }
+
+    /* Hardware Actuator & Control Module Tiles */
+    .hw-module-card {
+      position: relative;
+    }
+
+    .hw-switch-body {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 10px 12px;
+      border-radius: var(--radius-md);
+      background-color: var(--surface-recessed);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.55);
+    }
+
+    .hw-icon-housing {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: linear-gradient(180deg, #161f33 0%, #0d1322 100%);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 4px 10px rgba(0, 0, 0, 0.45);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-soft);
+      flex-shrink: 0;
+      transition: border-color var(--transition), color var(--transition), box-shadow var(--transition), background var(--transition);
+    }
+
+    .hw-icon-housing svg {
+      width: 22px;
+      height: 22px;
+    }
+
+    .hw-icon-housing.is-active {
+      background: linear-gradient(180deg, rgba(16, 185, 129, 0.22) 0%, rgba(6, 182, 212, 0.1) 100%);
+      border-color: var(--ok-bright);
+      color: var(--ok-bright);
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18), 0 0 18px rgba(16, 185, 129, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+    }
+
+    .hw-icon-housing.is-alert {
+      background: linear-gradient(180deg, rgba(239, 68, 68, 0.25) 0%, rgba(185, 28, 28, 0.14) 100%);
+      border-color: var(--alert-bright);
+      color: var(--alert-bright);
+      box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2), 0 0 20px rgba(239, 68, 68, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+    }
+
+    .hw-icon-housing.is-active .fan-svg {
+      animation: fan-spin 0.95s linear infinite;
+    }
+
+    @keyframes fan-spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .hw-readout {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .hw-status-pill {
+      display: inline-flex;
+      align-items: center;
+      align-self: flex-start;
+      gap: 6px;
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      background-color: rgba(255, 255, 255, 0.05);
+      color: var(--text-soft);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .hw-status-pill.is-on {
+      background-color: var(--ok-soft);
+      color: var(--ok-bright);
+      border-color: var(--ok-border);
+      box-shadow: 0 0 12px rgba(16, 185, 129, 0.22);
+    }
+
+    .hw-status-pill.is-alert {
+      background-color: var(--alert);
+      color: #ffffff;
+      border-color: rgba(252, 165, 165, 0.5);
+      box-shadow: 0 0 14px rgba(239, 68, 68, 0.4);
+    }
+
+    .hw-sublabel {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      line-height: 1.3;
+    }
+
+    .card-actuator-active {
+      border-color: rgba(16, 185, 129, 0.45);
+      background:
+        radial-gradient(ellipse 90% 80% at 20% 0%, rgba(16, 185, 129, 0.14), transparent 70%),
+        var(--surface);
+      box-shadow: 0 6px 24px rgba(16, 185, 129, 0.14), var(--inner-highlight);
+    }
+
+    .card-actuator-alert {
+      border-color: var(--alert-border);
+      background:
+        radial-gradient(ellipse 90% 80% at 20% 0%, rgba(239, 68, 68, 0.16), transparent 70%),
+        var(--surface);
+      box-shadow: 0 6px 24px rgba(239, 68, 68, 0.18), var(--inner-highlight);
+    }
+
+    .tile-primary {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.25;
+    }
+
+    .tile-primary.is-on {
+      color: var(--ok-bright);
+    }
+
+    .tile-primary.is-alert {
+      color: var(--alert-bright);
+    }
+
+    .tile-primary.is-ok {
+      color: var(--ok-bright);
+    }
+
+    .tile-note {
+      margin: 0;
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.45;
+      margin-top: auto;
+    }
+
+    .cooldown-note {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--accent-text);
+      padding: 6px 10px;
+      border-radius: var(--radius-sm);
+      background-color: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.24);
+    }
+
+    .cooldown-note:empty {
+      display: none;
+    }
+
+    /* LED Lamps inside Hardware Module */
+    .led-list {
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+      padding: 10px 12px;
+      border-radius: var(--radius-md);
+      background-color: var(--surface-recessed);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.55);
+    }
+
+    .led-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 13px;
+    }
+
+    .led-label-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .led-lamp {
+      width: 15px;
+      height: 15px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 32%, rgba(255, 255, 255, 0.35) 0%, var(--led-off) 58%, #0f172a 100%);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.65);
+      flex-shrink: 0;
+      transition: background var(--transition), box-shadow var(--transition), border-color var(--transition);
+    }
+
+    .led-lamp.green.is-on {
+      background: radial-gradient(circle at 35% 32%, #d1fae5 0%, var(--led-green-on) 48%, #047857 100%);
+      border-color: #6ee7b7;
+      box-shadow: 0 0 12px rgba(16, 185, 129, 0.8), 0 0 0 3px rgba(16, 185, 129, 0.22), inset 0 1px 1px rgba(255, 255, 255, 0.75);
+    }
+
+    .led-lamp.red.is-on {
+      background: radial-gradient(circle at 35% 32%, #fee2e2 0%, var(--led-red-on) 48%, #991b1b 100%);
+      border-color: #fca5a5;
+      box-shadow: 0 0 14px rgba(239, 68, 68, 0.85), 0 0 0 3px rgba(239, 68, 68, 0.24), inset 0 1px 1px rgba(255, 255, 255, 0.75);
+    }
+
+    .led-state-text {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background-color: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: var(--text-soft);
+    }
+
+    .led-state-text.is-on {
+      color: var(--text);
+      background-color: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .system-details {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 10px 12px;
+      border-radius: var(--radius-md);
+      background-color: var(--surface-recessed);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.55);
+      margin-top: auto;
+    }
+
+    .system-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* Chart Card */
+    .chart-card {
+      min-height: 375px;
+    }
+
+    .chart-legend-note {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 14px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .legend-swatch {
+      width: 14px;
+      height: 3px;
+      border-radius: 2px;
+      background-color: var(--chart-mq);
+    }
+
+    .legend-swatch.temp {
+      background-color: var(--chart-temp);
+    }
+
+    .legend-swatch.threshold {
+      background: repeating-linear-gradient(
+        to right,
+        var(--chart-threshold) 0 4px,
+        transparent 4px 7px
+      );
+    }
+
+    .chart-stage {
+      position: relative;
+      flex: 1 1 auto;
+      min-height: 280px;
+      width: 100%;
+      padding: 12px 10px 6px;
+      border-radius: var(--radius-md);
+      background-color: var(--surface-recessed);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.5);
+    }
+
+    .chart-fallback {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 20px;
+      border-radius: var(--radius-md);
+      background-color: var(--surface-recessed);
+      border: 1px dashed var(--border-strong);
+      color: var(--text-muted);
+      font-size: 13px;
+      gap: 6px;
+    }
+
+    /* Event Log */
+    .log-card {
+      max-height: 410px;
+    }
+
+    .event-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      overflow-y: auto;
+      flex: 1 1 auto;
+    }
+
+    .event-item {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 10px;
+      align-items: baseline;
+      padding: 9px 12px;
+      border-radius: var(--radius-sm);
+      background-color: var(--surface-recessed);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-left: 3px solid #475569;
+      font-size: 12.5px;
+      line-height: 1.4;
+    }
+
+    .event-item[data-kind="alert"] {
+      background-color: rgba(239, 68, 68, 0.1);
+      border-color: rgba(239, 68, 68, 0.18);
+      border-left: 3px solid #ef4444;
+    }
+
+    .event-item[data-kind="ok"] {
+      background-color: rgba(16, 185, 129, 0.08);
+      border-color: rgba(16, 185, 129, 0.16);
+      border-left: 3px solid #10b981;
+    }
+
+    .event-item[data-kind="warn"] {
+      background-color: rgba(245, 158, 11, 0.09);
+      border-color: rgba(245, 158, 11, 0.18);
+      border-left: 3px solid #f59e0b;
+    }
+
+    .event-item[data-kind="info"] {
+      border-left: 3px solid #38bdf8;
+    }
+
+    .event-time {
+      font-size: 11px;
+      color: var(--text-soft);
+      white-space: nowrap;
+    }
+
+    .event-msg {
+      color: var(--text);
+      word-break: break-word;
+    }
+
+    .event-item[data-kind="alert"] .event-msg {
+      color: #fca5a5;
+      font-weight: 600;
+    }
+
+    .event-item[data-kind="ok"] .event-msg {
+      color: #a7f3d0;
+    }
+
+    .event-item[data-kind="warn"] .event-msg {
+      color: #fde68a;
+    }
+
+    .event-empty {
+      font-size: 13px;
+      color: var(--text-soft);
+      padding: 12px 0;
+    }
+
+    /* Collapsible Hardware Pin Map */
+    .pinmap-card {
+      padding: 0;
+      gap: 0;
+      overflow: hidden;
+    }
+
+    .pinmap-toggle {
+      width: 100%;
+      padding: 15px 20px;
+      border: 0;
+      background-color: transparent;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      text-align: left;
+    }
+
+    .pinmap-toggle:hover {
+      background-color: rgba(255, 255, 255, 0.03);
+    }
+
+    .pinmap-chevron {
+      width: 16px;
+      height: 16px;
+      color: var(--text-muted);
+      transition: transform var(--transition);
+      flex-shrink: 0;
+    }
+
+    .pinmap-toggle[aria-expanded="true"] .pinmap-chevron {
+      transform: rotate(180deg);
+    }
+
+    .pinmap-body {
+      border-top: 1px solid var(--border);
+      padding: 14px 20px 18px;
+      overflow-x: auto;
+      background-color: var(--surface-recessed);
+    }
+
+    .pinmap-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .pinmap-table th,
+    .pinmap-table td {
+      text-align: left;
+      padding: 9px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .pinmap-table tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .pinmap-table th {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-soft);
+    }
+
+    /* Responsive */
+    @media (max-width: 1080px) {
+      .metrics-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .card-mq135 {
+        grid-column: 1 / -1;
+      }
+
+      .actuators-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .analytics-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .log-card {
+        max-height: 310px;
+      }
+    }
+
+    @media (max-width: 680px) {
+      .app-shell {
+        padding: 14px 14px 36px;
+        gap: 14px;
+      }
+
+      .app-header {
+        padding: 16px;
+      }
+
+      .header-controls {
+        width: 100%;
+        justify-content: space-between;
+      }
+
+      .connection-cluster {
+        align-items: flex-start;
+      }
+
+      .conn-reason {
+        text-align: left;
+      }
+
+      .metrics-grid,
+      .actuators-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .btn,
+      .toggle-btn {
+        min-height: 44px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+
+      .card:hover,
+      .btn:hover:not(:disabled),
+      .toggle-btn:hover {
+        transform: none !important;
+      }
+
+      .conn-badge[data-state="LIVE"] .conn-dot,
+      .conn-badge[data-state="DEMO"] .conn-dot,
+      .hw-icon-housing.is-active .fan-svg {
+        animation: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="top-accent-bar" aria-hidden="true"></div>
+
+  <div class="app-shell">
+    <!-- 1. Top Header Bar -->
+    <header class="app-header">
+      <div class="brand-block">
+        <div class="brand-mark" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2" />
+          </svg>
+        </div>
+        <div class="brand-copy">
+          <h1 class="brand-title">AirSense-IoT</h1>
+          <p class="brand-subtitle">Air Quality Monitoring System with Ventilation</p>
+        </div>
+      </div>
+
+      <div class="header-controls">
+        <div class="connection-cluster" aria-live="polite">
+          <div class="connection-row">
+            <span id="connBadge" class="conn-badge" data-state="STALE">
+              <span class="conn-dot" aria-hidden="true"></span>
+              <span id="connLabel">STALE</span>
+            </span>
+            <span id="syncCounter" class="sync-counter tabular">Last synced -- s ago</span>
+          </div>
+          <p id="connReason" class="conn-reason">Waiting for first sensor reading</p>
+        </div>
+
+        <div class="action-group">
+          <button id="refreshBtn" type="button" class="btn">Refresh</button>
+          <button id="demoToggleBtn" type="button" class="toggle-btn" role="switch" aria-checked="false">
+            <span class="toggle-track" aria-hidden="true"><span class="toggle-thumb"></span></span>
+            <span>Demo mode</span>
+          </button>
+          <button id="spikeBtn" type="button" class="btn btn-alert" hidden>Simulate smoke spike</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- 2. 5-Minute MQ-135 Preheat Banner -->
+    <section id="preheatBanner" class="preheat-banner" aria-label="MQ-135 sensor preheat status">
+      <div class="preheat-info">
+        <div class="preheat-top">
+          <h2 class="preheat-title">MQ-135 sensor preheat</h2>
+          <span id="preheatTimerText" class="preheat-timer tabular">0 / 300 s (0%)</span>
+        </div>
+        <p id="preheatDesc" class="preheat-desc">
+          The MQ-135 heating element needs about 5 minutes (300 s) to reach thermal stability for reliable baseline readings.
+        </p>
+        <div class="preheat-track" role="progressbar" aria-valuemin="0" aria-valuemax="300" aria-valuenow="0" id="preheatProgressbar">
+          <div id="preheatFill" class="preheat-fill"></div>
+        </div>
+      </div>
+      <div class="preheat-actions">
+        <button id="restartPreheatBtn" type="button" class="btn">Restart preheat timer</button>
+        <button id="dismissPreheatBtn" type="button" class="btn btn-ghost" aria-label="Dismiss preheat banner">Dismiss</button>
+      </div>
+    </section>
+
+    <main>
+      <!-- 3. Primary Metric Cards -->
+      <section class="metrics-grid" aria-label="Primary environmental metrics">
+        <article class="card card-mq135">
+          <div class="card-header">
+            <h2 class="card-title">MQ-135 Air Quality</h2>
+            <span id="mqPinLabel" class="card-meta tabular"></span>
+          </div>
+
+          <div class="gauge-stage">
+            <svg class="gauge-svg" viewBox="0 0 300 182" role="img" aria-label="MQ-135 semi-circular air quality gauge">
+              <defs>
+                <linearGradient id="mqGaugeGradClean" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="#10b981" />
+                  <stop offset="100%" stop-color="#06b6d4" />
+                </linearGradient>
+                <linearGradient id="mqGaugeGradAlert" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="#f97316" />
+                  <stop offset="100%" stop-color="#ef4444" />
+                </linearGradient>
+                <linearGradient id="mqGaugeGradWarn" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="#fbbf24" />
+                  <stop offset="100%" stop-color="#f59e0b" />
+                </linearGradient>
+              </defs>
+              <path class="gauge-track-arc" d="M 38 152 A 112 112 0 0 1 262 152" />
+              <path class="gauge-track-inner" d="M 38 152 A 112 112 0 0 1 262 152" />
+              <path
+                id="mqGaugeProgressArc"
+                class="gauge-progress-arc"
+                d="M 38 152 A 112 112 0 0 1 262 152"
+                stroke-dasharray="351.86"
+                stroke-dashoffset="351.86"
+              />
+              <line id="mqThresholdTick" class="gauge-threshold-tick" x1="150" y1="52" x2="150" y2="28" />
+              <circle id="mqThresholdDot" class="gauge-threshold-dot" cx="150" cy="28" r="3" />
+              <text id="mqThresholdPinLabel" class="gauge-threshold-label" x="150" y="16" text-anchor="middle">1500</text>
+            </svg>
+
+            <div class="gauge-center-overlay">
+              <span id="mqValue" class="gauge-value tabular">--</span>
+              <span id="mqUnitLabel" class="gauge-unit">Raw ADC (0–3000)</span>
+            </div>
+          </div>
+
+          <div id="mqStatusLabel" class="metric-status-badge">WAITING FOR READING</div>
+
+          <div class="gauge-footer-scale tabular">
+            <span>0</span>
+            <span id="mqThresholdText" class="gauge-threshold-pill">Threshold: 1500</span>
+            <span id="mqMaxScaleLabel">3000</span>
+          </div>
+        </article>
+
+        <article id="tempCard" class="card card-env">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="env-icon-badge temp-badge" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z" />
+                </svg>
+              </span>
+              <h2 class="card-title">Temperature</h2>
+            </div>
+            <span id="dhtTempPinLabel" class="card-meta tabular"></span>
+          </div>
+          <div class="metric-reading">
+            <span id="tempValue" class="metric-value tabular">--</span>
+            <span class="metric-unit">&deg;C</span>
+          </div>
+          <div id="tempCue" class="metric-cue">DHT11 ambient sensor</div>
+        </article>
+
+        <article id="humCard" class="card card-env">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="env-icon-badge hum-badge" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
+                </svg>
+              </span>
+              <h2 class="card-title">Humidity</h2>
+            </div>
+            <span id="dhtHumPinLabel" class="card-meta tabular"></span>
+          </div>
+          <div class="metric-reading">
+            <span id="humValue" class="metric-value tabular">--</span>
+            <span class="metric-unit">%</span>
+          </div>
+          <div id="humCue" class="metric-cue">DHT11 relative humidity</div>
+        </article>
+      </section>
+
+      <!-- 4. Hardware Actuator & System Modules -->
+      <section class="actuators-grid" style="margin-top: 16px;" aria-label="Hardware actuators and system status">
+        <article id="fanCard" class="card hw-module-card">
+          <div class="card-header">
+            <h2 class="card-title">Exhaust Fan (Ventilation)</h2>
+            <span id="fanPinLabel" class="card-meta tabular"></span>
+          </div>
+          <div class="hw-switch-body">
+            <div id="fanIconBox" class="hw-icon-housing" aria-hidden="true">
+              <svg class="fan-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 12c0-3 2.5-5.5 5-5.5 2 0 3.5 1.5 3.5 3.5 0 2-2 2-3.5 2H12z" />
+                <path d="M12 12c3 0 5.5 2.5 5.5 5 0 2-1.5 3.5-3.5 3.5-2 0-2-2-2-3.5V12z" />
+                <path d="M12 12c0 3-2.5 5.5-5 5.5-2 0-3.5-1.5-3.5-3.5 0-2 2-2 3.5-2H12z" />
+                <path d="M12 12c-3 0-5.5-2.5-5.5-5 0-2 1.5-3.5 3.5-3.5 2 0 2 2 2 3.5V12z" />
+              </svg>
+            </div>
+            <div class="hw-readout">
+              <span id="fanStateText" class="hw-status-pill">OFF</span>
+              <span id="fanSubState" class="hw-sublabel">Standby ventilation</span>
+            </div>
+          </div>
+          <div id="fanCooldownText" class="cooldown-note tabular"></div>
+          <p class="tile-note">
+            Turns ON when pollutants pass the threshold and OFF automatically about 2-3 minutes after the air clears.
+          </p>
+        </article>
+
+        <article id="buzzerCard" class="card hw-module-card">
+          <div class="card-header">
+            <h2 class="card-title">Buzzer</h2>
+            <span id="buzzerPinLabel" class="card-meta tabular"></span>
+          </div>
+          <div class="hw-switch-body">
+            <div id="buzzerIconBox" class="hw-icon-housing" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+              </svg>
+            </div>
+            <div class="hw-readout">
+              <span id="buzzerStateText" class="hw-status-pill">SILENT</span>
+              <span id="buzzerSubState" class="hw-sublabel">Alarm muted</span>
+            </div>
+          </div>
+          <p class="tile-note">Audible smoke and bad-air alarm driven directly by the ESP32 threshold state.</p>
+        </article>
+
+        <article class="card hw-module-card">
+          <div class="card-header">
+            <h2 class="card-title">Status LEDs</h2>
+            <span id="ledsPinSummary" class="card-meta tabular"></span>
+          </div>
+          <div class="led-list">
+            <div class="led-row">
+              <span class="led-label-wrap">
+                <span id="greenLedLamp" class="led-lamp green" aria-hidden="true"></span>
+                <span>Green LED <span id="greenLedPinLabel" class="tabular" style="color: var(--text-soft);"></span></span>
+              </span>
+              <span id="greenLedState" class="led-state-text tabular">OFF</span>
+            </div>
+            <div class="led-row">
+              <span class="led-label-wrap">
+                <span id="redLedLamp" class="led-lamp red" aria-hidden="true"></span>
+                <span>Red LED <span id="redLedPinLabel" class="tabular" style="color: var(--text-soft);"></span></span>
+              </span>
+              <span id="redLedState" class="led-state-text tabular">OFF</span>
+            </div>
+          </div>
+          <p class="tile-note">Physical indicator lenses mounted on the prototype enclosure.</p>
+        </article>
+
+        <article id="systemCard" class="card hw-module-card">
+          <div class="card-header">
+            <h2 class="card-title">System</h2>
+            <span class="card-meta">ESP32 DevKit V1</span>
+          </div>
+          <div id="systemStatusText" class="tile-primary">--</div>
+          <div class="system-details">
+            <div class="system-row">
+              <span>Firmware uptime</span>
+              <span id="uptimeText" class="tabular">--</span>
+            </div>
+            <div class="system-row">
+              <span>Last device timestamp</span>
+              <span id="deviceTimestampText" class="tabular">--</span>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <!-- 5 & 6. Real-Time Trend Chart + Recent Event Log -->
+      <section class="analytics-grid" style="margin-top: 16px;" aria-label="Telemetry chart and recent event log">
+        <article class="card chart-card">
+          <div class="card-header">
+            <h2 class="card-title">Real-time trend (last 40 readings)</h2>
+            <div class="chart-legend-note">
+              <span class="legend-item"><span class="legend-swatch"></span>MQ-135 (ADC)</span>
+              <span class="legend-item"><span class="legend-swatch temp"></span>Temp (&deg;C)</span>
+              <span class="legend-item"><span class="legend-swatch threshold"></span><span id="chartThresholdLegend" class="tabular">Threshold (1500)</span></span>
+            </div>
+          </div>
+          <div class="chart-stage">
+            <canvas id="telemetryChart" aria-label="MQ-135 and Temperature trend chart" role="img"></canvas>
+            <div id="chartFallback" class="chart-fallback" hidden>
+              <strong>Chart unavailable</strong>
+              <span>Chart.js could not be loaded from CDN. Live metric cards and the event log continue to update normally.</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="card log-card">
+          <div class="card-header">
+            <h2 class="card-title">Recent event log</h2>
+            <span id="eventCountLabel" class="card-meta tabular">0 / 20</span>
+          </div>
+          <ul id="eventList" class="event-list" aria-live="polite">
+            <li class="event-empty">No events recorded yet.</li>
+          </ul>
+        </article>
+      </section>
+
+      <!-- 7. Collapsible Hardware Pin Map -->
+      <section class="card pinmap-card" style="margin-top: 16px;" aria-label="Hardware pin mapping">
+        <button id="pinMapToggle" type="button" class="pinmap-toggle" aria-expanded="false" aria-controls="pinMapBody">
+          <span>Hardware pin map (ESP32 DevKit V1)</span>
+          <svg class="pinmap-chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M5 7.5L10 12.5L15 7.5" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </button>
+        <div id="pinMapBody" class="pinmap-body" hidden>
+          <table class="pinmap-table">
+            <thead>
+              <tr>
+                <th>Peripheral</th>
+                <th>ESP32 GPIO</th>
+                <th>Signal / Role</th>
+              </tr>
+            </thead>
+            <tbody id="pinMapTbody"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    (function () {
+      "use strict";
+
+      const CONFIG = {
+        url: "https://airsense-iot-219ec-default-rtdb.asia-southeast1.firebasedatabase.app/sensor_data.json",
+        pollMs: 2000,
+        staleMs: 10000,
+        timeoutMs: 5000,
+        maxPoints: 40,
+        maxEvents: 20,
+        preheatSec: 300,
+        mqMax: 3000
+      };
+
+      const PINS = {
+        dht11: 18,
+        mq135: 34,
+        buzzer: 14,
+        greenLed: 26,
+        redLed: 27,
+        fan: 4
+      };
+
+      // FUTURE HOOK: Remote threshold sync (AIR_QUALITY_THRESHOLD synced to/from Firebase)
+      // FUTURE HOOK: Manual fan override / live 2-3 minute post-smoke cooldown countdown
+      // FUTURE HOOK: Historical CSV export of session readings
+
+      const GAUGE_CX = 150;
+      const GAUGE_CY = 152;
+      const GAUGE_RADIUS = 112;
+      const GAUGE_ARC_LEN = Math.PI * GAUGE_RADIUS;
+
+      const state = {
+        mode: "live", // "live" | "demo"
+        modeEpoch: 0,
+        inFlight: false,
+        pollTimerId: null,
+        syncTickTimerId: null,
+        demoSpikeTimerId: null,
+        connState: "STALE",
+        connReason: "Waiting for first sensor reading",
+        lastChangedAt: null,
+        lastFingerprint: null,
+        latestData: null,
+        prevReading: null,
+        prevUptimeSec: null,
+        clientPreheatStartMs: Date.now(),
+        manualPreheatRestarted: false,
+        preheatDismissed: false,
+        chartPoints: [],
+        events: [],
+        chartInstance: null,
+        chartUnavailable: false,
+        demoTickCount: 0,
+        demoPhase: "normal", // "normal" | "spike" | "cooldown"
+        demoPhaseStartedAt: 0,
+        demoSpikeDurationMs: 12000,
+        demoCooldownDurationMs: 15000
+      };
+
+      const els = {
+        connBadge: document.getElementById("connBadge"),
+        connLabel: document.getElementById("connLabel"),
+        syncCounter: document.getElementById("syncCounter"),
+        connReason: document.getElementById("connReason"),
+        refreshBtn: document.getElementById("refreshBtn"),
+        demoToggleBtn: document.getElementById("demoToggleBtn"),
+        spikeBtn: document.getElementById("spikeBtn"),
+        preheatBanner: document.getElementById("preheatBanner"),
+        preheatTimerText: document.getElementById("preheatTimerText"),
+        preheatDesc: document.getElementById("preheatDesc"),
+        preheatProgressbar: document.getElementById("preheatProgressbar"),
+        preheatFill: document.getElementById("preheatFill"),
+        restartPreheatBtn: document.getElementById("restartPreheatBtn"),
+        dismissPreheatBtn: document.getElementById("dismissPreheatBtn"),
+        mqPinLabel: document.getElementById("mqPinLabel"),
+        mqValue: document.getElementById("mqValue"),
+        mqUnitLabel: document.getElementById("mqUnitLabel"),
+        mqMaxScaleLabel: document.getElementById("mqMaxScaleLabel"),
+        mqStatusLabel: document.getElementById("mqStatusLabel"),
+        mqGaugeProgressArc: document.getElementById("mqGaugeProgressArc"),
+        mqThresholdTick: document.getElementById("mqThresholdTick"),
+        mqThresholdDot: document.getElementById("mqThresholdDot"),
+        mqThresholdPinLabel: document.getElementById("mqThresholdPinLabel"),
+        mqThresholdText: document.getElementById("mqThresholdText"),
+        dhtTempPinLabel: document.getElementById("dhtTempPinLabel"),
+        dhtHumPinLabel: document.getElementById("dhtHumPinLabel"),
+        tempCard: document.getElementById("tempCard"),
+        tempValue: document.getElementById("tempValue"),
+        tempCue: document.getElementById("tempCue"),
+        humCard: document.getElementById("humCard"),
+        humValue: document.getElementById("humValue"),
+        humCue: document.getElementById("humCue"),
+        fanCard: document.getElementById("fanCard"),
+        fanPinLabel: document.getElementById("fanPinLabel"),
+        fanIconBox: document.getElementById("fanIconBox"),
+        fanStateText: document.getElementById("fanStateText"),
+        fanSubState: document.getElementById("fanSubState"),
+        fanCooldownText: document.getElementById("fanCooldownText"),
+        buzzerCard: document.getElementById("buzzerCard"),
+        buzzerPinLabel: document.getElementById("buzzerPinLabel"),
+        buzzerIconBox: document.getElementById("buzzerIconBox"),
+        buzzerStateText: document.getElementById("buzzerStateText"),
+        buzzerSubState: document.getElementById("buzzerSubState"),
+        ledsPinSummary: document.getElementById("ledsPinSummary"),
+        greenLedPinLabel: document.getElementById("greenLedPinLabel"),
+        redLedPinLabel: document.getElementById("redLedPinLabel"),
+        greenLedLamp: document.getElementById("greenLedLamp"),
+        redLedLamp: document.getElementById("redLedLamp"),
+        greenLedState: document.getElementById("greenLedState"),
+        redLedState: document.getElementById("redLedState"),
+        systemCard: document.getElementById("systemCard"),
+        systemStatusText: document.getElementById("systemStatusText"),
+        uptimeText: document.getElementById("uptimeText"),
+        deviceTimestampText: document.getElementById("deviceTimestampText"),
+        chartThresholdLegend: document.getElementById("chartThresholdLegend"),
+        telemetryChart: document.getElementById("telemetryChart"),
+        chartFallback: document.getElementById("chartFallback"),
+        eventCountLabel: document.getElementById("eventCountLabel"),
+        eventList: document.getElementById("eventList"),
+        pinMapToggle: document.getElementById("pinMapToggle"),
+        pinMapBody: document.getElementById("pinMapBody"),
+        pinMapTbody: document.getElementById("pinMapTbody")
+      };
+
+      function toFiniteNumber(val, fallback) {
+        if (val === null || val === undefined || typeof val === "boolean") {
+          return fallback;
+        }
+        if (typeof val === "string" && val.trim() === "") {
+          return fallback;
+        }
+        const n = Number(val);
+        return Number.isFinite(n) ? n : fallback;
+      }
+
+      function toBoolean(val, fallback) {
+        if (typeof val === "boolean") {
+          return val;
+        }
+        if (val === 1 || val === "1" || val === "true") {
+          return true;
+        }
+        if (val === 0 || val === "0" || val === "false") {
+          return false;
+        }
+        return fallback;
+      }
+
+      function normalize(raw) {
+        if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+          return {
+            hasData: false,
+            temperature: null,
+            humidity: null,
+            mq135: null,
+            threshold: 1500,
+            status: "OK",
+            fanOn: false,
+            buzzerOn: false,
+            greenLedOn: false,
+            redLedOn: false,
+            uptimeSec: null,
+            lastUpdated: null
+          };
+        }
+
+        const temperature = toFiniteNumber(raw.temperature, null);
+        const humidity = toFiniteNumber(raw.humidity, null);
+        const mq135Raw = toFiniteNumber(raw.mq135, null);
+        const mq135 = mq135Raw !== null ? Math.max(0, Math.round(mq135Raw)) : null;
+
+        let threshold = toFiniteNumber(raw.threshold, 1500);
+        if (threshold === null || threshold <= 0) {
+          threshold = 1500;
+        } else {
+          threshold = Math.round(threshold);
+        }
+
+        const hasAnyMetric = temperature !== null || humidity !== null || mq135 !== null;
+        if (!hasAnyMetric) {
+          return {
+            hasData: false,
+            temperature: null,
+            humidity: null,
+            mq135: null,
+            threshold: threshold,
+            status: "OK",
+            fanOn: false,
+            buzzerOn: false,
+            greenLedOn: false,
+            redLedOn: false,
+            uptimeSec: null,
+            lastUpdated: null
+          };
+        }
+
+        let status = typeof raw.status === "string" ? raw.status.trim().toUpperCase() : "";
+        if (status !== "OK" && status !== "BAD AIR" && status !== "WARMING_UP") {
+          status = mq135 !== null && mq135 > threshold ? "BAD AIR" : "OK";
+        }
+
+        const uptimeRaw = toFiniteNumber(raw.uptimeSec, null);
+        const uptimeSec = uptimeRaw !== null && uptimeRaw >= 0 ? Math.floor(uptimeRaw) : null;
+
+        const lastUpdatedRaw = toFiniteNumber(raw.lastUpdated, null);
+        const lastUpdated = lastUpdatedRaw !== null && lastUpdatedRaw > 0 ? Math.floor(lastUpdatedRaw) : null;
+
+        return {
+          hasData: true,
+          temperature: temperature,
+          humidity: humidity,
+          mq135: mq135,
+          threshold: threshold,
+          status: status,
+          fanOn: toBoolean(raw.fanOn, false),
+          buzzerOn: toBoolean(raw.buzzerOn, false),
+          greenLedOn: toBoolean(raw.greenLedOn, status === "OK"),
+          redLedOn: toBoolean(raw.redLedOn, status === "BAD AIR"),
+          uptimeSec: uptimeSec,
+          lastUpdated: lastUpdated
+        };
+      }
+
+      function computeGaugeGeometry(mq135, threshold) {
+        const maxScale = CONFIG.mqMax;
+        const safeThreshold = Math.max(1, Math.min(maxScale, Number.isFinite(threshold) ? threshold : 1500));
+        const tp = safeThreshold / maxScale;
+        const theta = tp * Math.PI;
+        const cosT = Math.cos(theta);
+        const sinT = Math.sin(theta);
+
+        const tickInnerR = GAUGE_RADIUS - 12;
+        const tickOuterR = GAUGE_RADIUS + 12;
+        const labelR = GAUGE_RADIUS + 24;
+
+        const ratio = mq135 === null ? 0 : Math.max(0, Math.min(mq135 / maxScale, 1));
+        const dashOffset = GAUGE_ARC_LEN * (1 - ratio);
+
+        return {
+          arcLength: GAUGE_ARC_LEN,
+          dashOffset: Number(dashOffset.toFixed(2)),
+          tickX1: Number((GAUGE_CX - tickInnerR * cosT).toFixed(1)),
+          tickY1: Number((GAUGE_CY - tickInnerR * sinT).toFixed(1)),
+          tickX2: Number((GAUGE_CX - tickOuterR * cosT).toFixed(1)),
+          tickY2: Number((GAUGE_CY - tickOuterR * sinT).toFixed(1)),
+          labelX: Number((GAUGE_CX - labelR * cosT).toFixed(1)),
+          labelY: Number((GAUGE_CY - labelR * sinT).toFixed(1)),
+          labelAnchor: tp < 0.45 ? "end" : (tp > 0.55 ? "start" : "middle")
+        };
+      }
+
+      function getFingerprint(data) {
+        if (!data || !data.hasData) return "null";
+        return [
+          data.temperature,
+          data.humidity,
+          data.mq135,
+          data.threshold,
+          data.status,
+          data.fanOn,
+          data.buzzerOn,
+          data.greenLedOn,
+          data.redLedOn,
+          data.uptimeSec,
+          data.lastUpdated
+        ].join("|");
+      }
+
+      function formatDuration(totalSec) {
+        const s = Math.max(0, Math.floor(totalSec));
+        const hrs = Math.floor(s / 3600);
+        const mins = Math.floor((s % 3600) / 60);
+        const secs = s % 60;
+        if (hrs > 0) {
+          return hrs + "h " + String(mins).padStart(2, "0") + "m " + String(secs).padStart(2, "0") + "s";
+        }
+        return String(mins).padStart(2, "0") + "m " + String(secs).padStart(2, "0") + "s";
+      }
+
+      function formatClockTime(dateObj) {
+        return dateObj.toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: false
+        });
+      }
+
+      function populateDynamicPinLabels() {
+        els.mqPinLabel.textContent = "GPIO " + PINS.mq135;
+        els.mqPinLabel.title = "MQ-135 sensor connected to GPIO " + PINS.mq135;
+        els.dhtTempPinLabel.textContent = "DHT11 · GPIO " + PINS.dht11;
+        els.dhtTempPinLabel.title = "DHT11 sensor connected to GPIO " + PINS.dht11;
+        els.dhtHumPinLabel.textContent = "DHT11 · GPIO " + PINS.dht11;
+        els.dhtHumPinLabel.title = "DHT11 sensor connected to GPIO " + PINS.dht11;
+        els.fanPinLabel.textContent = "GPIO " + PINS.fan;
+        els.fanPinLabel.title = "Exhaust fan relay on GPIO " + PINS.fan;
+        els.buzzerPinLabel.textContent = "GPIO " + PINS.buzzer;
+        els.buzzerPinLabel.title = "Active buzzer on GPIO " + PINS.buzzer;
+        els.ledsPinSummary.textContent = "GPIO " + PINS.greenLed + " / " + PINS.redLed;
+        els.ledsPinSummary.title = "Green LED on GPIO " + PINS.greenLed + ", Red LED on GPIO " + PINS.redLed;
+        els.greenLedPinLabel.textContent = "(GPIO " + PINS.greenLed + ")";
+        els.redLedPinLabel.textContent = "(GPIO " + PINS.redLed + ")";
+
+        els.mqUnitLabel.textContent = "Raw ADC (0–" + CONFIG.mqMax + ")";
+        els.mqMaxScaleLabel.textContent = String(CONFIG.mqMax);
+
+        const rows = [
+          { name: "DHT11 Temperature & Humidity", pin: PINS.dht11, role: "Digital single-wire environmental sensor" },
+          { name: "MQ-135 Gas & Smoke Sensor", pin: PINS.mq135, role: "Analog ADC input (0–" + CONFIG.mqMax + ")" },
+          { name: "Active Buzzer", pin: PINS.buzzer, role: "Audible bad-air / smoke alarm output" },
+          { name: "Green Status LED", pin: PINS.greenLed, role: "Air OK visual indicator" },
+          { name: "Red Status LED", pin: PINS.redLed, role: "Bad air / alert visual indicator" },
+          { name: "Exhaust Fan Relay", pin: PINS.fan, role: "Active ventilation relay control" }
+        ];
+
+        els.pinMapTbody.textContent = "";
+        for (const item of rows) {
+          const tr = document.createElement("tr");
+
+          const tdName = document.createElement("td");
+          tdName.textContent = item.name;
+
+          const tdPin = document.createElement("td");
+          tdPin.className = "tabular";
+          tdPin.textContent = "GPIO " + item.pin;
+
+          const tdRole = document.createElement("td");
+          tdRole.style.color = "var(--text-muted)";
+          tdRole.textContent = item.role;
+
+          tr.appendChild(tdName);
+          tr.appendChild(tdPin);
+          tr.appendChild(tdRole);
+          els.pinMapTbody.appendChild(tr);
+        }
+      }
+
+      function logEvent(msg, kind) {
+        const entry = {
+          time: formatClockTime(new Date()),
+          msg: String(msg),
+          kind: kind || "info"
+        };
+        state.events.unshift(entry);
+        if (state.events.length > CONFIG.maxEvents) {
+          state.events.length = CONFIG.maxEvents;
+        }
+        renderEventLog();
+      }
+
+      function renderEventLog() {
+        els.eventCountLabel.textContent = state.events.length + " / " + CONFIG.maxEvents;
+        els.eventList.textContent = "";
+
+        if (state.events.length === 0) {
+          const li = document.createElement("li");
+          li.className = "event-empty";
+          li.textContent = "No events recorded yet.";
+          els.eventList.appendChild(li);
+          return;
+        }
+
+        for (const entry of state.events) {
+          const li = document.createElement("li");
+          li.className = "event-item";
+          li.dataset.kind = entry.kind;
+
+          const timeSpan = document.createElement("span");
+          timeSpan.className = "event-time tabular";
+          timeSpan.textContent = entry.time;
+
+          const msgSpan = document.createElement("span");
+          msgSpan.className = "event-msg";
+          msgSpan.textContent = entry.msg;
+
+          li.appendChild(timeSpan);
+          li.appendChild(msgSpan);
+          els.eventList.appendChild(li);
+        }
+      }
+
+      function renderConnection() {
+        if (state.mode === "demo") {
+          state.connState = "DEMO";
+          state.connReason = "";
+        } else if (state.lastChangedAt !== null && Date.now() - state.lastChangedAt >= CONFIG.staleMs && state.connState === "LIVE") {
+          state.connState = "STALE";
+          state.connReason = "No new data for 10+ s";
+        }
+
+        els.connBadge.dataset.state = state.connState;
+        els.connLabel.textContent = state.connState;
+        els.connReason.textContent = state.connState === "STALE" ? state.connReason : "";
+
+        if (state.lastChangedAt === null) {
+          els.syncCounter.textContent = "Last synced -- s ago";
+        } else {
+          const elapsedSec = Math.max(0, Math.floor((Date.now() - state.lastChangedAt) / 1000));
+          els.syncCounter.textContent = "Last synced " + elapsedSec + " s ago";
+        }
+
+        const isDemo = state.mode === "demo";
+        els.demoToggleBtn.setAttribute("aria-checked", isDemo ? "true" : "false");
+        els.spikeBtn.hidden = !isDemo;
+      }
+
+      function renderPreheat(data) {
+        if (state.preheatDismissed) {
+          els.preheatBanner.hidden = true;
+          return;
+        }
+        els.preheatBanner.hidden = false;
+
+        let elapsedSec;
+        if (!state.manualPreheatRestarted && data && data.hasData && data.uptimeSec !== null) {
+          elapsedSec = data.uptimeSec;
+        } else {
+          elapsedSec = Math.floor((Date.now() - state.clientPreheatStartMs) / 1000);
+        }
+
+        const clamped = Math.max(0, Math.min(CONFIG.preheatSec, elapsedSec));
+        const pct = Math.round((clamped / CONFIG.preheatSec) * 100);
+        const remaining = Math.max(0, CONFIG.preheatSec - clamped);
+        const ready = clamped >= CONFIG.preheatSec && (!data || data.status !== "WARMING_UP");
+
+        els.preheatFill.style.width = pct + "%";
+        els.preheatProgressbar.setAttribute("aria-valuenow", String(clamped));
+        els.preheatBanner.classList.toggle("is-ready", ready);
+
+        if (ready) {
+          els.preheatTimerText.textContent = CONFIG.preheatSec + " / " + CONFIG.preheatSec + " s (Stabilized)";
+        } else {
+          els.preheatTimerText.textContent = clamped + " / " + CONFIG.preheatSec + " s (" + pct + "% · " + formatDuration(remaining) + " left)";
+        }
+      }
+
+      function getTemperatureCue(temp) {
+        if (temp === null) return "DHT11 ambient sensor";
+        if (temp < 20) return "Cool";
+        if (temp <= 27) return "Comfortable";
+        if (temp <= 33) return "Warm";
+        return "Hot";
+      }
+
+      function getHumidityCue(hum) {
+        if (hum === null) return "DHT11 relative humidity";
+        if (hum < 35) return "Dry";
+        if (hum <= 65) return "Comfortable";
+        return "Humid";
+      }
+
+      function renderDashboard(data) {
+        const hasData = Boolean(data && data.hasData);
+        const isBadAir = hasData && data.status === "BAD AIR";
+        document.body.classList.toggle("is-alert", isBadAir);
+
+        // MQ-135 Hero SVG Arc Gauge
+        const threshold = hasData ? data.threshold : 1500;
+        const mqReading = hasData ? data.mq135 : null;
+        const geom = computeGaugeGeometry(mqReading, threshold);
+
+        els.mqGaugeProgressArc.setAttribute("stroke-dasharray", geom.arcLength.toFixed(2));
+        els.mqGaugeProgressArc.setAttribute("stroke-dashoffset", String(geom.dashOffset));
+        els.mqGaugeProgressArc.classList.toggle("is-warmup", hasData && data.status === "WARMING_UP");
+
+        els.mqThresholdTick.setAttribute("x1", String(geom.tickX1));
+        els.mqThresholdTick.setAttribute("y1", String(geom.tickY1));
+        els.mqThresholdTick.setAttribute("x2", String(geom.tickX2));
+        els.mqThresholdTick.setAttribute("y2", String(geom.tickY2));
+        els.mqThresholdDot.setAttribute("cx", String(geom.tickX2));
+        els.mqThresholdDot.setAttribute("cy", String(geom.tickY2));
+        els.mqThresholdPinLabel.setAttribute("x", String(geom.labelX));
+        els.mqThresholdPinLabel.setAttribute("y", String(geom.labelY));
+        els.mqThresholdPinLabel.setAttribute("text-anchor", geom.labelAnchor);
+        els.mqThresholdPinLabel.textContent = String(threshold);
+
+        els.mqThresholdText.textContent = "Threshold: " + threshold;
+        els.chartThresholdLegend.textContent = "Threshold (" + threshold + ")";
+
+        if (!hasData || data.mq135 === null) {
+          els.mqValue.textContent = "--";
+          els.mqStatusLabel.textContent = "WAITING FOR READING";
+          els.mqStatusLabel.className = "metric-status-badge";
+        } else {
+          els.mqValue.textContent = String(data.mq135);
+          if (data.status === "BAD AIR") {
+            els.mqStatusLabel.textContent = "SMOKE / BAD AIR DETECTED";
+            els.mqStatusLabel.className = "metric-status-badge is-alert";
+          } else if (data.status === "WARMING_UP") {
+            els.mqStatusLabel.textContent = "SENSOR WARMING UP";
+            els.mqStatusLabel.className = "metric-status-badge is-warn";
+          } else {
+            els.mqStatusLabel.textContent = "CLEAN AIR";
+            els.mqStatusLabel.className = "metric-status-badge is-ok";
+          }
+        }
+
+        // Temperature & Humidity
+        const tempCueText = hasData ? getTemperatureCue(data.temperature) : "DHT11 ambient sensor";
+        els.tempValue.textContent = hasData && data.temperature !== null ? data.temperature.toFixed(1) : "--";
+        els.tempCue.textContent = tempCueText;
+        els.tempCard.dataset.cue = hasData && data.temperature !== null ? tempCueText.toLowerCase() : "";
+
+        const humCueText = hasData ? getHumidityCue(data.humidity) : "DHT11 relative humidity";
+        els.humValue.textContent = hasData && data.humidity !== null ? data.humidity.toFixed(1) : "--";
+        els.humCue.textContent = humCueText;
+        els.humCard.dataset.cue = hasData && data.humidity !== null ? humCueText.toLowerCase() : "";
+
+        // Exhaust Fan (Ventilation)
+        const fanOn = hasData && data.fanOn;
+        els.fanCard.classList.toggle("card-actuator-active", fanOn);
+        els.fanIconBox.classList.toggle("is-active", fanOn);
+        els.fanStateText.textContent = fanOn ? "ACTIVE / ON" : "OFF";
+        els.fanStateText.className = fanOn ? "hw-status-pill is-on" : "hw-status-pill";
+        els.fanSubState.textContent = fanOn ? "Active ventilation running" : "Standby ventilation";
+
+        if (state.mode === "demo" && state.demoPhase === "cooldown" && fanOn) {
+          const remainingMs = Math.max(0, state.demoCooldownDurationMs - (Date.now() - state.demoPhaseStartedAt));
+          const remainingSec = Math.ceil(remainingMs / 1000);
+          els.fanCooldownText.textContent = "Cooldown: " + remainingSec + " s remaining (shortened for demo)";
+        } else {
+          els.fanCooldownText.textContent = "";
+        }
+
+        // Buzzer
+        const buzzerOn = hasData && data.buzzerOn;
+        els.buzzerCard.classList.toggle("card-actuator-alert", buzzerOn);
+        els.buzzerIconBox.classList.toggle("is-alert", buzzerOn);
+        els.buzzerStateText.textContent = buzzerOn ? "ACTIVE / ON" : "SILENT";
+        els.buzzerStateText.className = buzzerOn ? "hw-status-pill is-alert" : "hw-status-pill";
+        els.buzzerSubState.textContent = buzzerOn ? "Audible alarm sounding" : "Alarm muted";
+
+        // Status LEDs
+        const greenOn = hasData && data.greenLedOn;
+        const redOn = hasData && data.redLedOn;
+        els.greenLedLamp.classList.toggle("is-on", greenOn);
+        els.redLedLamp.classList.toggle("is-on", redOn);
+        els.greenLedState.textContent = greenOn ? "ON" : "OFF";
+        els.redLedState.textContent = redOn ? "ON" : "OFF";
+        els.greenLedState.classList.toggle("is-on", greenOn);
+        els.redLedState.classList.toggle("is-on", redOn);
+
+        // System Tile
+        els.systemCard.classList.toggle("card-actuator-alert", isBadAir);
+        if (!hasData) {
+          els.systemStatusText.textContent = "--";
+          els.systemStatusText.className = "tile-primary";
+          els.uptimeText.textContent = "--";
+          els.deviceTimestampText.textContent = "--";
+        } else {
+          els.systemStatusText.textContent = data.status;
+          els.systemStatusText.className =
+            data.status === "BAD AIR" ? "tile-primary is-alert" :
+            data.status === "WARMING_UP" ? "tile-primary" : "tile-primary is-ok";
+          els.uptimeText.textContent = data.uptimeSec !== null ? formatDuration(data.uptimeSec) : "Not reported";
+          els.deviceTimestampText.textContent = data.lastUpdated !== null
+            ? new Date(data.lastUpdated * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })
+            : "Not reported";
+        }
+
+        renderPreheat(data);
+        renderConnection();
+      }
+
+      function getChartColors() {
+        const styles = getComputedStyle(document.documentElement);
+        return {
+          mq: styles.getPropertyValue("--chart-mq").trim() || "#2dd4bf",
+          mqAlert: styles.getPropertyValue("--chart-mq-alert").trim() || "#f87171",
+          temp: styles.getPropertyValue("--chart-temp").trim() || "#38bdf8",
+          threshold: styles.getPropertyValue("--chart-threshold").trim() || "#f87171",
+          grid: styles.getPropertyValue("--chart-grid").trim() || "rgba(255,255,255,0.06)",
+          text: styles.getPropertyValue("--text-soft").trim() || "#64748b"
+        };
+      }
+
+      function buildMqAreaGradient(context) {
+        const chart = context.chart;
+        const ctx = chart.ctx;
+        const area = chart.chartArea;
+        if (!area) {
+          return "rgba(45, 212, 191, 0.14)";
+        }
+        const gradient = ctx.createLinearGradient(0, area.top, 0, area.bottom);
+        const isAlert = document.body.classList.contains("is-alert");
+        if (isAlert) {
+          gradient.addColorStop(0, "rgba(248, 113, 113, 0.34)");
+          gradient.addColorStop(0.65, "rgba(248, 113, 113, 0.08)");
+          gradient.addColorStop(1, "rgba(248, 113, 113, 0.0)");
+        } else {
+          gradient.addColorStop(0, "rgba(45, 212, 191, 0.32)");
+          gradient.addColorStop(0.65, "rgba(6, 182, 212, 0.08)");
+          gradient.addColorStop(1, "rgba(6, 182, 212, 0.0)");
+        }
+        return gradient;
+      }
+
+      const thresholdLinePlugin = {
+        id: "thresholdLine",
+        afterDatasetsDraw(chart) {
+          const threshold = chart.options.plugins.thresholdValue;
+          if (!Number.isFinite(threshold)) return;
+          const yScale = chart.scales.y;
+          const area = chart.chartArea;
+          if (!yScale || !area) return;
+
+          const yPos = yScale.getPixelForValue(threshold);
+          if (yPos < area.top || yPos > area.bottom) return;
+
+          const colors = getChartColors();
+          const ctx = chart.ctx;
+          ctx.save();
+          ctx.beginPath();
+          ctx.setLineDash([6, 4]);
+          ctx.lineWidth = 1.75;
+          ctx.strokeStyle = colors.threshold;
+          ctx.moveTo(area.left, yPos);
+          ctx.lineTo(area.right, yPos);
+          ctx.stroke();
+
+          ctx.fillStyle = colors.threshold;
+          ctx.font = "600 11px 'JetBrains Mono', monospace";
+          ctx.textAlign = "right";
+          ctx.fillText("Threshold " + threshold, area.right - 6, yPos - 6);
+          ctx.restore();
+        }
+      };
+
+      function ensureChartInitialized() {
+        if (state.chartInstance) return true;
+        if (typeof window.Chart !== "function") {
+          state.chartUnavailable = true;
+          els.chartFallback.hidden = false;
+          return false;
+        }
+
+        state.chartUnavailable = false;
+        els.chartFallback.hidden = true;
+        const colors = getChartColors();
+
+        state.chartInstance = new window.Chart(els.telemetryChart.getContext("2d"), {
+          type: "line",
+          data: {
+            labels: [],
+            datasets: [
+              {
+                label: "MQ-135 (ADC)",
+                data: [],
+                yAxisID: "y",
+                borderColor: colors.mq,
+                backgroundColor: buildMqAreaGradient,
+                fill: true,
+                borderWidth: 2.25,
+                tension: 0.34,
+                pointRadius: 2,
+                pointHoverRadius: 5
+              },
+              {
+                label: "Temperature (°C)",
+                data: [],
+                yAxisID: "y1",
+                borderColor: colors.temp,
+                backgroundColor: "transparent",
+                fill: false,
+                borderWidth: 2,
+                tension: 0.34,
+                pointRadius: 2,
+                pointHoverRadius: 5
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            interaction: {
+              mode: "index",
+              intersect: false
+            },
+            plugins: {
+              legend: { display: false },
+              thresholdValue: 1500
+            },
+            scales: {
+              x: {
+                grid: { color: colors.grid },
+                ticks: {
+                  color: colors.text,
+                  maxTicksLimit: 8,
+                  font: { family: "'JetBrains Mono', monospace", size: 11 }
+                }
+              },
+              y: {
+                type: "linear",
+                position: "left",
+                min: 0,
+                max: CONFIG.mqMax,
+                grid: { color: colors.grid },
+                ticks: {
+                  color: colors.text,
+                  font: { family: "'JetBrains Mono', monospace", size: 11 }
+                },
+                title: {
+                  display: true,
+                  text: "MQ-135 (Raw ADC)",
+                  color: colors.text,
+                  font: { family: "'Plus Jakarta Sans', sans-serif", size: 11, weight: "600" }
+                }
+              },
+              y1: {
+                type: "linear",
+                position: "right",
+                suggestedMin: 15,
+                suggestedMax: 45,
+                grid: { drawOnChartArea: false },
+                ticks: {
+                  color: colors.text,
+                  font: { family: "'JetBrains Mono', monospace", size: 11 }
+                },
+                title: {
+                  display: true,
+                  text: "Temp (°C)",
+                  color: colors.text,
+                  font: { family: "'Plus Jakarta Sans', sans-serif", size: 11, weight: "600" }
+                }
+              }
+            }
+          },
+          plugins: [thresholdLinePlugin]
+        });
+
+        return true;
+      }
+
+      function updateChart(data) {
+        if (!data || !data.hasData) return;
+
+        state.chartPoints.push({
+          label: formatClockTime(new Date()),
+          mq135: data.mq135,
+          temperature: data.temperature,
+          threshold: data.threshold
+        });
+
+        if (state.chartPoints.length > CONFIG.maxPoints) {
+          state.chartPoints.shift();
+        }
+
+        if (!ensureChartInitialized()) return;
+
+        const colors = getChartColors();
+        const chart = state.chartInstance;
+        chart.data.labels = state.chartPoints.map(function (p) { return p.label; });
+        chart.data.datasets[0].data = state.chartPoints.map(function (p) { return p.mq135; });
+        chart.data.datasets[0].borderColor = data.status === "BAD AIR" ? colors.mqAlert : colors.mq;
+        chart.data.datasets[1].data = state.chartPoints.map(function (p) { return p.temperature; });
+        chart.options.plugins.thresholdValue = data.threshold;
+        chart.options.scales.y.max = CONFIG.mqMax;
+        chart.update("none");
+      }
+
+      function resetChart() {
+        state.chartPoints = [];
+        if (state.chartInstance) {
+          state.chartInstance.data.labels = [];
+          state.chartInstance.data.datasets[0].data = [];
+          state.chartInstance.data.datasets[1].data = [];
+          state.chartInstance.update("none");
+        }
+      }
+
+      function detectAndLogTransitions(data) {
+        if (!data || !data.hasData) return;
+
+        // Reboot detection via uptime drop or WARMING_UP transition
+        const uptimeDropped = data.uptimeSec !== null && state.prevUptimeSec !== null && data.uptimeSec < state.prevUptimeSec;
+        const enteredWarmup = data.status === "WARMING_UP" && (!state.prevReading || state.prevReading.status !== "WARMING_UP");
+
+        if (uptimeDropped || enteredWarmup) {
+          state.clientPreheatStartMs = Date.now();
+          state.manualPreheatRestarted = false;
+          state.preheatDismissed = false;
+          logEvent("ESP32 reboot or warm-up detected; preheat timer reset", "warn");
+        }
+
+        if (data.uptimeSec !== null) {
+          state.prevUptimeSec = data.uptimeSec;
+        }
+
+        if (!state.prevReading) {
+          const mqText = data.mq135 !== null ? "MQ-135: " + data.mq135 : "MQ-135: --";
+          logEvent("Initial reading received (" + data.status + ", " + mqText + ")", data.status === "BAD AIR" ? "alert" : "ok");
+          state.prevReading = data;
+          return;
+        }
+
+        const prev = state.prevReading;
+
+        if (prev.status !== data.status) {
+          if (data.status === "BAD AIR") {
+            logEvent("Air " + prev.status + " -> BAD AIR (MQ-135: " + data.mq135 + ")", "alert");
+          } else if (prev.status === "BAD AIR" && data.status === "OK") {
+            logEvent("Returned to Air OK (MQ-135: " + data.mq135 + ")", "ok");
+          } else {
+            logEvent("Status changed: " + prev.status + " -> " + data.status, "info");
+          }
+        }
+
+        if (prev.fanOn !== data.fanOn) {
+          logEvent(data.fanOn ? "Exhaust fan turned ON" : "Exhaust fan turned OFF", data.fanOn ? "info" : "ok");
+        }
+
+        if (prev.buzzerOn !== data.buzzerOn) {
+          logEvent(data.buzzerOn ? "Buzzer alarm activated" : "Buzzer silenced", data.buzzerOn ? "alert" : "info");
+        }
+
+        state.prevReading = data;
+      }
+
+      function applyIncomingPayload(raw) {
+        const data = normalize(raw);
+
+        if (!data.hasData) {
+          state.connState = "STALE";
+          state.connReason = "No sensor data yet (null)";
+          renderConnection();
+          return;
+        }
+
+        const fp = getFingerprint(data);
+        const isChanged = fp !== state.lastFingerprint;
+
+        state.latestData = data;
+
+        if (isChanged) {
+          state.lastFingerprint = fp;
+          state.lastChangedAt = Date.now();
+          state.connState = state.mode === "demo" ? "DEMO" : "LIVE";
+          state.connReason = "";
+          detectAndLogTransitions(data);
+          updateChart(data);
+        } else if (state.mode === "live" && state.lastChangedAt !== null) {
+          if (Date.now() - state.lastChangedAt >= CONFIG.staleMs) {
+            state.connState = "STALE";
+            state.connReason = "No new data for 10+ s";
+          }
+        }
+
+        renderDashboard(data);
+      }
+
+      async function fetchSensorData() {
+        if (state.mode !== "live") return;
+        if (state.inFlight) return;
+
+        const epochAtStart = state.modeEpoch;
+        state.inFlight = true;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(function () {
+          controller.abort();
+        }, CONFIG.timeoutMs);
+
+        try {
+          const response = await fetch(CONFIG.url, {
+            cache: "no-store",
+            signal: controller.signal
+          });
+
+          if (epochAtStart !== state.modeEpoch || state.mode !== "live") {
+            return;
+          }
+
+          if (!response.ok) {
+            state.connState = "STALE";
+            state.connReason = "Network or CORS/Firebase rule error";
+            renderConnection();
+            return;
+          }
+
+          const raw = await response.json();
+          if (epochAtStart !== state.modeEpoch || state.mode !== "live") {
+            return;
+          }
+
+          applyIncomingPayload(raw);
+        } catch (err) {
+          if (epochAtStart !== state.modeEpoch || state.mode !== "live") {
+            return;
+          }
+          state.connState = "STALE";
+          if (err && err.name === "AbortError") {
+            state.connReason = "Request timed out";
+          } else {
+            state.connReason = "Network or CORS/Firebase rule error";
+          }
+          renderConnection();
+        } finally {
+          clearTimeout(timeoutId);
+          state.inFlight = false;
+        }
+      }
+
+      function generateDemoPayload() {
+        state.demoTickCount += 1;
+        const now = Date.now();
+        const elapsedSincePhase = now - state.demoPhaseStartedAt;
+
+        if (state.demoPhase === "spike" && elapsedSincePhase >= state.demoSpikeDurationMs) {
+          state.demoPhase = "cooldown";
+          state.demoPhaseStartedAt = now;
+        } else if (state.demoPhase === "cooldown" && elapsedSincePhase >= state.demoCooldownDurationMs) {
+          state.demoPhase = "normal";
+          state.demoPhaseStartedAt = now;
+        }
+
+        const wave = Math.sin(state.demoTickCount * 0.55);
+        const threshold = 1500;
+        let mq135;
+        let status = "OK";
+        let fanOn = false;
+        let buzzerOn = false;
+        let greenLedOn = true;
+        let redLedOn = false;
+
+        if (state.demoPhase === "spike") {
+          mq135 = Math.round(2260 + wave * 180 + (Math.random() * 60 - 30));
+          status = "BAD AIR";
+          fanOn = true;
+          buzzerOn = true;
+          greenLedOn = false;
+          redLedOn = true;
+        } else if (state.demoPhase === "cooldown") {
+          mq135 = Math.round(680 + wave * 65);
+          status = "OK";
+          fanOn = true;
+          buzzerOn = false;
+          greenLedOn = true;
+          redLedOn = false;
+        } else {
+          mq135 = Math.round(540 + wave * 55 + (Math.random() * 30 - 15));
+        }
+
+        const tempBase = state.demoPhase === "spike" ? 29.4 : 26.8;
+        const temperature = Number((tempBase + Math.cos(state.demoTickCount * 0.35) * 0.4).toFixed(1));
+        const humidity = Number((54.0 + Math.sin(state.demoTickCount * 0.25) * 1.6).toFixed(1));
+        const clientElapsedSec = Math.floor((now - state.clientPreheatStartMs) / 1000);
+
+        return {
+          temperature: temperature,
+          humidity: humidity,
+          mq135: mq135,
+          threshold: threshold,
+          status: status,
+          fanOn: fanOn,
+          buzzerOn: buzzerOn,
+          greenLedOn: greenLedOn,
+          redLedOn: redLedOn,
+          uptimeSec: clientElapsedSec,
+          lastUpdated: Math.floor(now / 1000)
+        };
+      }
+
+      function runPollCycle() {
+        if (state.mode === "demo") {
+          applyIncomingPayload(generateDemoPayload());
+        } else {
+          fetchSensorData();
+        }
+      }
+
+      function startPollingLoop() {
+        if (state.pollTimerId !== null) {
+          clearInterval(state.pollTimerId);
+        }
+        state.pollTimerId = setInterval(runPollCycle, CONFIG.pollMs);
+      }
+
+      function resetSessionForModeSwitch(nextMode) {
+        state.modeEpoch += 1;
+        state.mode = nextMode;
+        state.inFlight = false;
+        state.lastChangedAt = null;
+        state.lastFingerprint = null;
+        state.latestData = null;
+        state.prevReading = null;
+        state.prevUptimeSec = null;
+        state.clientPreheatStartMs = Date.now();
+        state.manualPreheatRestarted = false;
+        state.preheatDismissed = false;
+        state.demoTickCount = 0;
+        state.demoPhase = "normal";
+        state.demoPhaseStartedAt = Date.now();
+        state.events = [];
+
+        resetChart();
+        renderEventLog();
+        renderDashboard(normalize(null));
+
+        if (nextMode === "demo") {
+          state.connState = "DEMO";
+          state.connReason = "";
+          logEvent("Switched to Demo mode (simulated ESP32 telemetry)", "info");
+          applyIncomingPayload(generateDemoPayload());
+        } else {
+          state.connState = "STALE";
+          state.connReason = "Connecting to Firebase...";
+          logEvent("Switched to Live Firebase mode", "info");
+          renderConnection();
+          fetchSensorData();
+        }
+      }
+
+      function triggerSmokeSpike() {
+        if (state.mode !== "demo") return;
+        state.demoPhase = "spike";
+        state.demoPhaseStartedAt = Date.now();
+        logEvent("Demo smoke spike triggered (~12 s spike, 15 s fan cooldown)", "warn");
+        applyIncomingPayload(generateDemoPayload());
+      }
+
+      function bindControls() {
+        els.refreshBtn.addEventListener("click", function () {
+          runPollCycle();
+        });
+
+        els.demoToggleBtn.addEventListener("click", function () {
+          const nextMode = state.mode === "live" ? "demo" : "live";
+          resetSessionForModeSwitch(nextMode);
+        });
+
+        els.spikeBtn.addEventListener("click", function () {
+          triggerSmokeSpike();
+        });
+
+        els.restartPreheatBtn.addEventListener("click", function () {
+          state.clientPreheatStartMs = Date.now();
+          state.manualPreheatRestarted = true;
+          state.preheatDismissed = false;
+          renderPreheat(state.latestData);
+          logEvent("Preheat timer restarted (300 s)", "info");
+        });
+
+        els.dismissPreheatBtn.addEventListener("click", function () {
+          state.preheatDismissed = true;
+          renderPreheat(state.latestData);
+        });
+
+        els.pinMapToggle.addEventListener("click", function () {
+          const expanded = els.pinMapToggle.getAttribute("aria-expanded") === "true";
+          const next = !expanded;
+          els.pinMapToggle.setAttribute("aria-expanded", next ? "true" : "false");
+          els.pinMapBody.hidden = !next;
+        });
+      }
+
+      function init() {
+        populateDynamicPinLabels();
+        bindControls();
+        renderDashboard(normalize(null));
+        renderEventLog();
+
+        // Check Chart.js readiness after deferred load and render baseline axes
+        window.addEventListener("load", function () {
+          if (typeof window.Chart !== "function") {
+            state.chartUnavailable = true;
+            els.chartFallback.hidden = false;
+          } else {
+            ensureChartInitialized();
+            if (state.chartInstance && state.chartPoints.length > 0) {
+              const latest = state.chartPoints[state.chartPoints.length - 1];
+              const colors = getChartColors();
+              state.chartInstance.data.labels = state.chartPoints.map(function (p) { return p.label; });
+              state.chartInstance.data.datasets[0].data = state.chartPoints.map(function (p) { return p.mq135; });
+              state.chartInstance.data.datasets[0].borderColor = document.body.classList.contains("is-alert") ? colors.mqAlert : colors.mq;
+              state.chartInstance.data.datasets[1].data = state.chartPoints.map(function (p) { return p.temperature; });
+              state.chartInstance.options.plugins.thresholdValue = latest.threshold;
+              state.chartInstance.update("none");
+            }
+          }
+        });
+
+        // Smooth 1-second timer for "Last synced X s ago", preheat progress, and demo cooldown countdown
+        state.syncTickTimerId = setInterval(function () {
+          renderConnection();
+          renderPreheat(state.latestData);
+          if (state.mode === "demo") {
+            const elapsed = Date.now() - state.demoPhaseStartedAt;
+            if (
+              (state.demoPhase === "spike" && elapsed >= state.demoSpikeDurationMs) ||
+              (state.demoPhase === "cooldown" && elapsed >= state.demoCooldownDurationMs)
+            ) {
+              applyIncomingPayload(generateDemoPayload());
+            } else if (state.demoPhase === "cooldown" && state.latestData) {
+              renderDashboard(state.latestData);
+            }
+          }
+        }, 1000);
+
+        fetchSensorData();
+        startPollingLoop();
+      }
+
+      // Expose testable pure helpers without polluting runtime behavior
+      window.__AIRSENSE_TEST_HOOKS__ = {
+        CONFIG: CONFIG,
+        PINS: PINS,
+        normalize: normalize,
+        computeGaugeGeometry: computeGaugeGeometry
+      };
+
+      init();
+    })();
+  </script>
+</body>
+</html>
